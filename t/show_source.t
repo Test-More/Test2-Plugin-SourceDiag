@@ -3,7 +3,7 @@ use Test2::API qw/intercept/;
 use Test2::Plugin::SourceDiag;
 
 my $events = intercept {
-    Test2::Plugin::SourceDiag->import;
+    Test2::Plugin::SourceDiag->import();
     ok(0, "This will fail");
 
     is(

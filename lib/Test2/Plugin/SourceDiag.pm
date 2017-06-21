@@ -12,11 +12,59 @@ use Test2::API qw{
 };
 
 my %SEEN;
+
 sub import {
-    test2_add_callback_post_load(sub {
-        my $hub = test2_stack()->top;
-        $hub->listen(\&listener, inherit => 1);
-    });
+    my $class  = shift;
+    my %params = @_;
+
+    $params{show_source} = 1 unless defined $params{show_source};
+
+    test2_add_callback_post_load(
+        sub {
+            my $hub = test2_stack()->top;
+            $hub->filter(\&filter, inherit => 1) if $params{show_source} || $params{inject_name};
+            $hub->listen(\&listener, inherit => 1) if $params{show_source} || $params{show_args};
+            $hub->add_context_init(\&context_init) if $params{show_args};
+        }
+    );
+}
+
+sub context_init {
+    my $ctx = shift;
+
+    package DB;
+
+    my @caller = caller(1);
+    my %args   = @DB::args;
+    my $level  = $args{level} || 1;
+
+    @caller = caller(1 + $level);
+    $ctx->trace->{args} = [@DB::args];
+}
+
+sub filter {
+    my ($hub, $event) = @_;
+    return $event unless $event->causes_fail;
+
+    my $trace = $event->trace           or return $event;
+    my $code  = get_assert_code($trace) or return $event;
+
+    chomp($code);
+
+    if ($event->can('name') && !$event->name && $event->can('set_name')) {
+        my $text = join "\n" => @{$code->{source}};
+        $text =~ s/^\s*//;
+        $event->set_name($text);
+    }
+    else {
+        my $start = $code->{start};
+        my $end   = $code->{end};
+        my $len   = length("$end");
+        my $text = join "\n" => map { sprintf("% ${len}s: %s", $start++, $_) } @{$code->{source}};
+        $event->meta(__PACKAGE__, {})->{code} = $text;
+    }
+
+    return $event;
 }
 
 sub listener {
@@ -24,23 +72,36 @@ sub listener {
 
     return unless $event->causes_fail;
 
-    my $trace = $event->trace or return;
-    my $code  = get_assert_code($trace) or return;
+    my $trace = $event->trace;
+    my $meta  = $event->get_meta(__PACKAGE__);
+    my $code  = $meta ? $meta->{code} : undef;
+    my $args  = $trace ? $trace->{args} : undef;
 
-    chomp($code);
+    return unless $code || $args;
 
-    $hub->send(Test2::Event::Diag->new(
-        trace => $trace,
-        message => "Failure source code:\n------------\n$code\n------------\n",
-    ));
+    my $msg = '';
+
+    $msg .= "Failure source code:\n------------\n$code\n------------\n"
+        if $code;
+
+    $msg .= "Failure Arguments: (" . join(', ', map { defined($_) ? "'$_'" : 'undef' } @$args) . ")"
+        if $args;
+
+    $hub->send(
+        Test2::Event::Diag->new(
+            trace   => $trace,
+            message => $msg,
+        )
+    );
 }
 
 my %CACHE;
+
 sub get_assert_code {
     my ($trace) = @_;
 
-    my $file = $trace->file or return;
-    my $line = $trace->line or return;
+    my $file = $trace->file    or return;
+    my $line = $trace->line    or return;
     my $sub  = $trace->subname or return;
     my $short_sub = $sub;
     $short_sub =~ s/^.*:://;
@@ -52,7 +113,7 @@ sub get_assert_code {
     my $pd = $CACHE{$file} ||= PPI::Document->new($file);
     $pd->index_locations;
 
-    my $it = $pd->find(sub {!$_[1]->isa('PPI::Token::Whitespace') && $_[1]->logical_line_number == $line }) or return;
+    my $it = $pd->find(sub { !$_[1]->isa('PPI::Token::Whitespace') && $_[1]->logical_line_number == $line }) or return;
 
     my $found = $it->[0] or return;
 
@@ -79,9 +140,11 @@ sub get_assert_code {
     }
 
     my $start = $found->logical_line_number;
-    my $end = $start + $#source;
-    my $len = length("$end");
-    return join "\n" => map {sprintf("% ${len}s: %s", $start++, $_)} @source;
+    return {
+        start  => $start,
+        end    => $start + $#source,
+        source => \@source,
+    };
 }
 
 1;
@@ -124,6 +187,58 @@ Produces the output:
     # ------------
     # Failed test 'fail'
     # at test.pl line 4.
+
+=head1 IMPORT OPTIONS
+
+=head2 show_source
+
+    use Test2::Plugin::SourceDiag show_source => $bool;
+
+C<show_source> is set to on by default. You can specify C<0> if you want to
+turn it off.
+
+Source output:
+
+    not ok 1 - fail
+    Failure source code:
+    # ------------
+    # 4: ok(0, "fail");
+    # ------------
+    # Failed test 'fail'
+    # at test.pl line 4.
+
+=head2 show_args
+
+    use Test2::Plugin::SourceDiag show_args => $bool
+
+C<show_args> is set to off by default. You can turn it on with a true value.
+
+Args output:
+
+    not ok 1 - fail
+    Failure source code:
+    # ------------
+    # 4: ok($x, "fail");
+    # ------------
+    # Failure Arguments: (0, 'fail')      <----- here
+    # Failed test 'fail'
+    # at test.pl line 4.
+
+=head2 inject_name
+
+    use Test2::Plugin::SourceDiag inject_name => $bool
+
+C<inject_name> is off by default. You may turn it on if desired.
+
+This feature will inject the source as the name of your assertion if the name
+has not already been set. When this happens the failure source diag will not be
+seen as the name is sufficient.
+
+    not ok 1 - ok($x eq $y);
+    # Failed test 'ok($x eq $y);'
+    # at test.pl line 4.
+
+B<note:> This works perfectly fine with multi-line statements.
 
 =head1 SOURCE
 

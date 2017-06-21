@@ -31,6 +31,58 @@ Produces the output:
     # Failed test 'fail'
     # at test.pl line 4.
 
+# IMPORT OPTIONS
+
+## show\_source
+
+    use Test2::Plugin::SourceDiag show_source => $bool;
+
+`show_source` is set to on by default. You can specify `0` if you want to
+turn it off.
+
+Source output:
+
+    not ok 1 - fail
+    Failure source code:
+    # ------------
+    # 4: ok(0, "fail");
+    # ------------
+    # Failed test 'fail'
+    # at test.pl line 4.
+
+## show\_args
+
+    use Test2::Plugin::SourceDiag show_args => $bool
+
+`show_args` is set to off by default. You can turn it on with a true value.
+
+Args output:
+
+    not ok 1 - fail
+    Failure source code:
+    # ------------
+    # 4: ok($x, "fail");
+    # ------------
+    # Failure Arguments: (0, 'fail')      <----- here
+    # Failed test 'fail'
+    # at test.pl line 4.
+
+## inject\_name
+
+    use Test2::Plugin::SourceDiag inject_name => $bool
+
+`inject_name` is off by default. You may turn it on if desired.
+
+This feature will inject the source as the name of your assertion if the name
+has not already been set. When this happens the failure source diag will not be
+seen as the name is sufficient.
+
+    not ok 1 - ok($x eq $y);
+    # Failed test 'ok($x eq $y);'
+    # at test.pl line 4.
+
+**note:** This works perfectly fine with multi-line statements.
+
 # SOURCE
 
 The source code repository for Test2-Plugin-SourceDiag can be found at

@@ -1,8 +1,14 @@
 use Test2::V0;
 use Test2::API qw/intercept/;
-use Test2::Plugin::SourceDiag;
+use Test2::Plugin::SourceDiag show_args => 1, inject_name => 1;
 
 ok(0, "This will fail");
+
+ok(0);
+
+ok(
+    0 != 0
+);
 
 is(
     {a => 1},
@@ -18,6 +24,18 @@ is(
         end;
     },
     "hash test",
+);
+
+ok(
+    (!grep {
+        !!$_
+        # Let us just throw in a really big ass comment here, what will happen to this garbage?
+        # jgfhsdfjghsdjfghfsdjhgjdfhgjdhgjsdhfjshfjhsdjfhgjsdhgjhjfhgjsdhgjsdhgjdhgjdshgjdhsjgf
+        # jgfhsdfjghsdjfghfsdjhgjdfhgjdhgjsdhfjshfjhsdjfhgjsdhgjhjfhgjsdhgjsdhgjdhgjdshgjdhsjgf
+        # jgfhsdfjghsdjfghfsdjhgjdfhgjdhgjsdhfjshfjhsdjfhgjsdhgjhjfhgjsdhgjsdhgjdhgjdshgjdhsjgf
+        # jgfhsdfjghsdjfghfsdjhgjdfhgjdhgjsdhfjshfjhsdjfhgjsdhgjhjfhgjsdhgjsdhgjdhgjdshgjdhsjgf
+    } qw/a b c/),
+    "Test::Expr chokes on this"
 );
 
 done_testing;
