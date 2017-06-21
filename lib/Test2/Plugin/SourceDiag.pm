@@ -6,6 +6,8 @@ our $VERSION = '0.000003';
 
 use Test2::Event::Diag;
 
+use Scalar::Util();
+
 use Test2::API qw{
     test2_add_callback_post_load
     test2_stack
@@ -39,7 +41,8 @@ sub context_init {
     my $level  = $args{level} || 1;
 
     @caller = caller(1 + $level);
-    $ctx->trace->{args} = [@DB::args];
+
+    $ctx->trace->{args} = [grep { !Scalar::Util::blessed($_) || !$_->isa('Test::Builder')} @DB::args];
 }
 
 sub filter {
