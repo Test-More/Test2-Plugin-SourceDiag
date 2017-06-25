@@ -1,5 +1,7 @@
 {{$NEXT}}
 
+    - Remove useless chomp
+
 0.000003  2017-06-21 11:34:47-07:00 America/Los_Angeles
 
     - Handle Test::Builder better

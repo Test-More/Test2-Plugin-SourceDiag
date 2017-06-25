@@ -52,8 +52,6 @@ sub filter {
     my $trace = $event->trace           or return $event;
     my $code  = get_assert_code($trace) or return $event;
 
-    chomp($code);
-
     if ($event->can('name') && !$event->name && $event->can('set_name')) {
         my $text = join "\n" => @{$code->{source}};
         $text =~ s/^\s*//;
