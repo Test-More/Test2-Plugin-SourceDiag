@@ -2,7 +2,7 @@ package Test2::Plugin::SourceDiag;
 use strict;
 use warnings;
 
-our $VERSION = '0.000005';
+our $VERSION = '0.000006';
 
 use Test2::Event::Diag;
 
