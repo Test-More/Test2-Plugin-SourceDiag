@@ -52,12 +52,14 @@ sub filter {
     my $trace = $event->trace           or return $event;
     my $code  = get_assert_code($trace) or return $event;
 
+    my $name_set = 0;
     if ($event->can('name') && !$event->name && $event->can('set_name')) {
         my $text = join "\n" => @{$code->{source}};
         $text =~ s/^\s*//;
-        $event->set_name($text);
+        $name_set = eval { $event->set_name($text); 1 };
     }
-    else {
+
+    unless ($name_set) {
         my $start = $code->{start};
         my $end   = $code->{end};
         my $len   = length("$end");
